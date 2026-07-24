@@ -268,22 +268,23 @@ def search(
 
     print(f"\n🔍 Original query: '{q}'")
     final_results = []
-    words = q.strip().split()
 
     if is_exact_query(q):
-        # SHORT query → exact match path
+        # ── EXACT MATCH PATH ──────────────────────────────────────────────
         print("  Mode: Exact Match")
         exact_results = exact_match_search(q)
 
         if exact_results:
             scored = score_exact_results(exact_results, q)
             exact_ids = set()
+
             for person, score in scored[:top_k]:
                 formatted = format_person(person)
                 formatted["relevance_score"] = round(score, 4)
                 final_results.append(formatted)
                 exact_ids.add(formatted["employee_id"])
 
+            # Fill remaining slots with semantic results
             remaining = top_k - len(final_results)
             if remaining > 0:
                 print(f"  {len(final_results)} exact match(es) — filling {remaining} with semantic")
@@ -291,29 +292,21 @@ def search(
                 for item in semantic_fill:
                     if len(final_results) >= top_k:
                         break
+                    # Slightly lower score to keep exact matches visually prioritized
                     item["relevance_score"] = round(item["relevance_score"] * 0.85, 4)
                     final_results.append(item)
 
+        # Full fallback if exact match returned nothing
         if not final_results:
             print("  No exact matches → full semantic fallback")
             final_results = run_semantic_pipeline(q, top_k=top_k)
 
-    elif len(words) > 3:
-        # LONG query with proper nouns → hybrid search
-        print("  Mode: Hybrid Search")
-        keywords = extract_keywords(q)
-        if keywords:
-            print(f"  Extracted keywords: {keywords}")
-            final_results = hybrid_search(q, top_k=top_k)
-        else:
-            print("  No keywords found → semantic search")
-            final_results = run_semantic_pipeline(q, top_k=top_k)
-
     else:
-        # MEDIUM query → semantic search
+        # ── SEMANTIC SEARCH PATH ──────────────────────────────────────────
         print("  Mode: Semantic Search")
         final_results = run_semantic_pipeline(q, top_k=top_k)
 
+    # ── LOG SEARCH ────────────────────────────────────────────────────────
     search_logs_collection.insert_one({
         "query_text": q.strip(),
         "timestamp": datetime.utcnow(),
@@ -326,19 +319,7 @@ def search(
 
 
 @router.get("/all")
-def get_all_for_sort(
-    sort_by: str = Query(default="none"),
-    order: str = Query(default="desc")
-):
-    """Returns all personnel records, optionally sorted server-side."""
-    sort_field = None
-    if sort_by == "experience":
-        sort_field = "years_of_experience"
-
-    if sort_field:
-        direction = -1 if order == "desc" else 1
-        persons = list(personnel_collection.find({}).sort(sort_field, direction))
-    else:
-        persons = list(personnel_collection.find({}))
-
+def get_all_for_sort():
+    """Returns all personnel records for client-side sorting."""
+    persons = list(personnel_collection.find({}))
     return {"results": [format_person(p) for p in persons]}

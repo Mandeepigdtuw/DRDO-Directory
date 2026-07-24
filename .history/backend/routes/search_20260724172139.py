@@ -326,19 +326,7 @@ def search(
 
 
 @router.get("/all")
-def get_all_for_sort(
-    sort_by: str = Query(default="none"),
-    order: str = Query(default="desc")
-):
-    """Returns all personnel records, optionally sorted server-side."""
-    sort_field = None
-    if sort_by == "experience":
-        sort_field = "years_of_experience"
-
-    if sort_field:
-        direction = -1 if order == "desc" else 1
-        persons = list(personnel_collection.find({}).sort(sort_field, direction))
-    else:
-        persons = list(personnel_collection.find({}))
-
+def get_all_for_sort():
+    """Returns all personnel records for client-side sorting."""
+    persons = list(personnel_collection.find({}))
     return {"results": [format_person(p) for p in persons]}
